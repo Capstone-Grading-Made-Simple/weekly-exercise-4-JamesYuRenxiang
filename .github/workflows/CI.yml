@@ -1,0 +1,127 @@
+name: Weekly Exercise 4 Test
+
+on:
+  push:
+    branches: [master, main]
+
+env:
+  OWNER: Capstone-Grading-Made-Simple
+
+  # Please change these accordingly
+  YOURNAME: Linus Tay
+  REPONAME: Weekly_Exercise-4
+
+jobs:
+  run-tests:
+    name: Run Tests
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Current Repository
+        uses: actions/checkout@v2
+        
+      - name: Checkout Test Scripts
+        uses: actions/checkout@v2
+        with:
+          repository: JamesYuRenxiang/JUnit_MAD_Exercise-4
+          path: tests
+            
+      - name: Create Test Files
+        run: |
+          cp tests/ListActivityTest.kt app/src/androidTest/java/com/example/week4exercise/ListActivityTest.kt
+          cp tests/MainActivityTest.kt app/src/androidTest/java/com/example/week4exercise/MainActivityTest.kt
+
+      - name: Set Up JDK 11
+        uses: actions/setup-java@v1
+        with: 
+          java-version: 11
+
+      - name: Make gradlew Executable
+        run: chmod +x ./gradlew
+        
+      - name: Run Tests
+        if: ${{ always() }}
+        run: ./gradlew testDebugUnitTest
+
+      - name: Run Android Tests
+        if: ${{ always() }}
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          script: ./gradlew connectedCheck
+
+      - name: Upload Test Report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: unit-test-report
+          path: 
+            ./app/build/reports/tests/testDebugUnitTest/*
+
+      - name: Upload Test Report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: instrumentation-test-report
+          path: 
+            ./app/build/reports/androidTests/connected/*
+
+  push-tests-pass:
+    if: ${{ always() }}
+    needs: [run-tests]
+    name: Push Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Current Repository
+        uses: actions/checkout@v2
+
+      - name: Download all workflow run artifacts
+        uses: actions/download-artifact@v2
+
+      - name: Rearrange path location of test results
+        id: rearrange
+        run: |
+          mkdir pushfolder
+          cp instrumentation-test-report/index.html unit-test.html
+          cp unit-test-report/index.html instrumentation-test.html
+
+      - name: Create file with information (Build Failed)
+        if: steps.build.outputs.exit_code == 0 && ${{ failure() }} 
+        run: |
+          echo "${GITHUB_REPOSITORY}" > context.txt
+          echo "${GITHUB_SHA}" >> context.txt
+          echo "syntax" >> context.txt
+
+      - name: Create file with information (Not All Tests Passed)
+        if: needs.run-tests.result == 'failure'
+        run: |
+          echo "${GITHUB_REPOSITORY}" > context.txt
+          echo "${GITHUB_SHA}" >> context.txt
+          echo "failure" >> context.txt
+
+      - name: Create file with information (All Tests Passed)
+        if: needs.run-tests.result == 'success'
+        run: |
+          echo "${GITHUB_REPOSITORY}" > context.txt
+          echo "${GITHUB_SHA}" >> context.txt
+          echo "success" >> context.txt
+
+      # - name: Pushes Context File to Web Application Repository
+      #   uses: dmnemec/copy_file_to_another_repo_action@main
+      #   env:
+      #     API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+      #   with:
+      #     source_file: 'context.txt'
+      #     destination_repo: ${{env.OWNER}}/${{env.REPONAME}}
+      #     user_email: 'regimelt@hotmail.com'
+      #     user_name: 'Linus-Tay'
+      #     destination_branch: 'context'
+
+      # - name: Test
+      #   uses: Linus-Tay/store-text-file-in-firebase@v3.0
+      #   with:
+      #     owner: ${{env.OWNER}}
+      #     yourName: ${{env.YOURNAME}}
+      #     repoName: ${{env.REPONAME}}
+      #     fileName: "context.txt"
